@@ -54,7 +54,9 @@ class ConvAE:
 
         z_mean = Dense(latent_dim)(h)
         z_log_var = Dense(latent_dim)(h)
-
+        
+        
+        3edwdqwd
         self.encoder = Model(x, z_mean)
 
         z = Input(shape=(latent_dim,))
