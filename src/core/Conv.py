@@ -15,10 +15,11 @@ class ConvAE:
         h = x
 
 
-
+        
         filters = params['filters']
         latent_dim = params['latent_dim']
         num_classes = params['n_clusters']
+        #Encoder
         for i in range(1):
             filters *= 2
 
@@ -52,11 +53,13 @@ class ConvAE:
         h_shape = K.int_shape(h)[1:]
         h = Flatten()(h)
 
+        
+        #prior : standard normal
         z_mean = Dense(latent_dim)(h)
         z_log_var = Dense(latent_dim)(h)
         
         
-        3edwdqwd
+        
         self.encoder = Model(x, z_mean)
 
         z = Input(shape=(latent_dim,))
@@ -64,6 +67,7 @@ class ConvAE:
         h = Dense(np.prod(h_shape))(h)
         h = Reshape(h_shape)(h)
 
+        #Decoder1
         for i in range(2):
             h = Conv2DTranspose(filters=filters,
                                 kernel_size=3,
@@ -76,23 +80,23 @@ class ConvAE:
                                 padding='same')(h)
             h = LeakyReLU(0.2)(h)
             filters //= 2
-
+       
         x_recon = Conv2DTranspose(filters=1,
                                 kernel_size=3,
                                 activation='sigmoid',
                                 padding='same')(h)
-
+        
         self.decoder = Model(z, x_recon)
-
+        #recon1
         x_recon1 = self.decoder(z_mean)
 
-
+        # calculate the affinity matrix
         W = costs.knn_affinity(z_mean, params['n_nbrs'], scale=2.62, scale_nbr=params['scale_nbr'])
         W = W - self.P
 
         self.Dy = tf.placeholder(tf.float32, [None, 10], name='Dy')
 
-     
+        #spectralnet
         z = Input(shape=(latent_dim,))
         y = Dense(1024, activation='relu')(z)
         y = Dense(1024, activation='relu')(y)
@@ -113,7 +117,7 @@ class ConvAE:
 
         Dy = costs.squared_distance(outputs)
 
-
+        #Loss of spectralnet
         loss_SPNet = (K.sum(W * Dy))/1024
 
 
@@ -124,6 +128,7 @@ class ConvAE:
             return z_mean + K.exp(z_log_var / 2) * epsilon
 
         z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_var])
+        #recon2
         x_recon = self.decoder(z)
 
         def shuffling(x):
@@ -132,9 +137,11 @@ class ConvAE:
             return K.gather(x, idxs)
 
         z_shuffle = Lambda(shuffling)(z)
+        #z for MI
         z_z_1 = Concatenate()([z, z])
         z_z_2 = Concatenate()([z, z_shuffle])
 
+        
         z_in = Input(shape=(latent_dim * 2,))
         z1 = z_in
         z1 = Dense(latent_dim, activation='relu')(z1)
